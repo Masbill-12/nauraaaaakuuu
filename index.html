@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>For Winda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:italic,wght@300;400;600&family=Plus+Jakarta+Sans:wght@200;300;400&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #d4af37; --dark: #050505; --glow: rgba(212, 175, 55, 0.4); }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--dark); color: white; margin: 0; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        .font-serif { font-family: 'Cormorant Garamond', serif; }
+
+        .section { display: none; opacity: 0; min-height: 100vh; width: 100%; flex-direction: column; align-items: center; transition: opacity 1s ease; position: relative; }
+        .active { display: flex; opacity: 1; }
+
+        #particleCanvas { position: fixed; inset: 0; z-index: -1; }
+
+        #overlay-blur {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(0px); opacity: 0; pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 40;
+        }
+        body.menu-open #overlay-blur { opacity: 1; backdrop-filter: blur(15px); pointer-events: auto; }
+
+        .message-card {
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
+            border-radius: 12px; padding: 2rem; border-left: 2px solid rgba(212, 175, 55, 0.3);
+            margin-bottom: 2.5rem; opacity: 0; transform: translateY(20px);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); position: relative; user-select: none;
+        }
+        .message-card.reveal { opacity: 1; transform: translateY(0); }
+
+        .message-card:hover:not(.focused) {
+            background: rgba(255, 255, 255, 0.06); border-left: 2px solid var(--gold);
+            transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .message-card.focused {
+            z-index: 50; background: rgba(255, 255, 255, 0.12) !important;
+            border-left: 2px solid var(--gold) !important; transform: scale(1.05) !important;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+        }
+
+        .action-menu {
+            position: absolute; bottom: -55px; right: 0; display: flex; gap: 8px;
+            opacity: 0; transform: translateY(10px); transition: 0.3s ease;
+        }
+        .focused .action-menu { opacity: 1; transform: translateY(0); }
+        .action-item {
+            background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 20px;
+            font-size: 11px; color: var(--gold); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .drop-cap { float: left; font-size: 3.5rem; line-height: 0.8; font-family: 'Cormorant Garamond', serif; color: var(--gold); margin-right: 12px; font-style: italic; }
+        .divider { width: 40px; height: 1px; background: var(--gold); margin: 3rem auto; opacity: 0.2; }
+
+        .btn-luxury { padding: 1rem 3rem; border: 1px solid var(--gold); color: var(--gold); font-size: 10px; letter-spacing: 0.5em; text-transform: uppercase; cursor: pointer; transition: 0.4s; background: transparent; }
+        .btn-luxury:hover { background: var(--gold); color: black; box-shadow: 0 0 20px var(--glow); }
+    </style>
+</head>
+<body class="bg-black">
+
+    <!-- AUDIO ELEMENT - Taruh di luar section agar tidak ikut ter-reset -->
+    <audio id="backsong" preload="auto" loop>
+        <source src="tunggal.mp3" type="audio/mpeg">
+    </audio>
+
+    <canvas id="particleCanvas"></canvas>
+    <div id="overlay-blur" onclick="closeMenu()"></div>
+
+    <!-- STAGE 1: INTRO -->
+    <section id="stage1" class="section active justify-center">
+        <h1 class="text-6xl font-serif italic mb-10 tracking-widest text-white">Winda.</h1>
+        <button onclick="startExperience()" class="btn-luxury">Only For Winda</button>
+    </section>
+
+    <!-- STAGE 2: GAME -->
+    <section id="stage2" class="section justify-center">
+        <div class="text-center mb-8">
+            <h2 class="text-xl font-serif italic text-gold">Petik Bintang</h2>
+            <p class="text-[8px] tracking-[0.5em] opacity-30 uppercase text-white">Kumpulkan 8 cahaya</p>
+        </div>
+        <canvas id="gameCanvas" style="background: rgba(255,255,255,0.02); border-radius: 12px;"></canvas>
+        <div class="mt-6 text-gold font-serif text-2xl tracking-[0.8em]"><span id="score">0</span> / 8</div>
+    </section>
+
+    <!-- STAGE 3: LETTER -->
+    <section id="stage3" class="section !justify-start pt-[30vh] pb-[20vh] px-6 overflow-y-auto">
+        <div class="max-w-xl w-full mx-auto" id="letter-content-wrapper">
+            <div id="letter-header" class="mb-40">
+                <h2 class="text-6xl font-serif italic mb-4 leading-tight text-white">Happy<br>Birthday.</h2>
+                <div class="w-10 h-[1px] bg-gold"></div>
+            </div>
+            <div id="dynamic-messages"></div>
+        </div>
+
+        <div id="final-touch" class="hidden py-20 text-center px-4 w-full">
+            <div class="message-card !opacity-100 !transform-none border-t border-l-0 mx-auto max-w-sm mb-12">
+                <p class="font-serif italic text-3xl mb-3 text-white">Enjoy your day, sayang.</p>
+                <span class="text-[10px] tracking-[0.5em] text-gold/50 uppercase block mb-4">You are my favorite person</span>
+                <span class="text-[10px] tracking-[0.8em] text-white/20 uppercase block">— Sabil —</span>
+            </div>
+            <button onclick="backToStart()" class="btn-luxury !text-[8px] !py-3 !px-8 opacity-40 hover:opacity-100">Mulai Lagi</button>
+        </div>
+    </section>
+
+    <script>
+        let score = 0;
+        let isLetterStarted = false;
+        const song = document.getElementById('backsong');
+
+        /* BG PARTICLES */
+        const pCanvas = document.getElementById('particleCanvas');
+        const pCtx = pCanvas.getContext('2d');
+        function initP() { pCanvas.width = window.innerWidth; pCanvas.height = window.innerHeight; }
+        window.addEventListener('resize', initP); initP();
+        let pts = Array(60).fill().map(() => ({ x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight, v: Math.random()*0.2 + 0.1, s: Math.random()*1.2 }));
+        function drawP() {
+            pCtx.clearRect(0,0,pCanvas.width, pCanvas.height); pCtx.fillStyle = "rgba(212, 175, 55, 0.2)";
+            pts.forEach(p => { p.y -= p.v; if(p.y < 0) p.y = pCanvas.height; pCtx.beginPath(); pCtx.arc(p.x, p.y, p.s, 0, Math.PI*2); pCtx.fill(); });
+            requestAnimationFrame(drawP);
+        }
+        drawP();
+
+        /* AUDIO FIX & EXPERIENCE START */
+        function startExperience() { 
+            // Coba putar musik dengan penanganan error autoplay
+            song.play().catch(error => {
+                console.log("Autoplay blocked, waiting for interaction");
+            });
+            transition(1, 2); 
+            initGame(); 
+        }
+
+        /* GAME ENGINE */
+        const gCanvas = document.getElementById('gameCanvas');
+        const gCtx = gCanvas.getContext('2d');
+        let stars = [];
+        function initGame() {
+            score = 0; document.getElementById('score').innerText = "0";
+            gCanvas.width = 280; gCanvas.height = 350;
+            stars = Array(8).fill().map(() => ({ x: Math.random()*240+20, y: Math.random()*310+20, a: Math.random()*Math.PI }));
+            loopGame();
+        }
+        gCanvas.addEventListener('mousedown', (e) => {
+            const rect = gCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+            stars.forEach((s, i) => {
+                if(Math.hypot(x - s.x, y - s.y) < 35) {
+                    stars.splice(i, 1); score++;
+                    document.getElementById('score').innerText = score;
+                    confetti({ particleCount: 15, colors: ['#d4af37'], origin: { x: e.clientX/window.innerWidth, y: e.clientY/window.innerHeight } });
+                }
+            });
+            if(score >= 8) {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                setTimeout(() => transition(2, 3, true), 800);
+            }
+        });
+        function loopGame() {
+            if(score >= 8) return;
+            gCtx.fillStyle = 'rgba(5, 5, 5, 0.3)'; gCtx.fillRect(0,0,280,350);
+            stars.forEach(s => { s.a += 0.05; gCtx.fillStyle = `rgba(212, 175, 55, ${0.4+Math.sin(s.a)*0.4})`; gCtx.beginPath(); gCtx.arc(s.x, s.y, 4, 0, Math.PI*2); gCtx.fill(); });
+            requestAnimationFrame(loopGame);
+        }
+
+        /* HAPTIC & MENU */
+        function setupHaptic(card) {
+            let pressTimer;
+            const openMenu = () => {
+                document.body.classList.add('menu-open');
+                card.classList.add('focused');
+                if (window.navigator.vibrate) window.navigator.vibrate(15);
+                const menu = document.createElement('div');
+                menu.className = 'action-menu';
+                menu.innerHTML = `<div class="action-item">Love ❤️</div><div class="action-item">Copy</div>`;
+                card.appendChild(menu);
+            };
+            const startPress = () => { pressTimer = setTimeout(openMenu, 600); };
+            const endPress = () => { clearTimeout(pressTimer); };
+            card.addEventListener('mousedown', startPress);
+            card.addEventListener('mouseup', endPress);
+            card.addEventListener('touchstart', startPress);
+            card.addEventListener('touchend', endPress);
+        }
+
+        function closeMenu() {
+            document.body.classList.remove('menu-open');
+            document.querySelectorAll('.message-card').forEach(c => {
+                c.classList.remove('focused');
+                const m = c.querySelector('.action-menu'); if(m) m.remove();
+            });
+        }
+
+        /* QUOTES DATA */
+        const quotes = [
+            "haiiii makasii yaa uda ngebukaa inii dan mainin minigamesss tadii",
+            "sebenernya aku bingung harus mulaii darii manaa rasanee banyakk kataa yangg mauu akuu ketikk, tapii akuu sederhanainn ajaa yaa",
+            "selamatt birthdayyy windaaa, makasii yaa udaa lahirr diduniaa iniii makasii jugaa udaa nemeninn akuu,mengenalmuu adalahh hall yangg sangatt aku syukuriii",
+            "diumurmuu yangg baruu inii semogaa semestaa selaluu menjaga senyummu. kamuu punyaa daya tarikk tersendiri buatt akuu, sertaa duniakuu jadii lebihh indahh sejak adaa kamuu",
+            "semogaa setiapp langkahmu diringankan, setiap bebanmu dikuatkan, dan semoga mimpi yang kamu dimpan bisa terwujudd satu per satuu di waktu yang paling tepat",
+            "jangan pernah ragu untuk jadi dirimu sendiri. kamu yang apa adanyaa dengan segala tawa dan ceritamuu sudah lebih dari cukup untuk orang yang menyayangimu (termasuk aku hehe)",
+            "makasiii jugaa yaa udaa mauu nemeninnn harii hariikuu akhirr akhirr inii. akuu sangat menikmati segala obrolann kitaa, candaaa tawaa muu ituu lahh yang membuat akuu senangg semogaa ajaa kedepannya kitaa akann teruss kayaa ginii",
+            "maaff jugaa kaloo akuu belumm bisaa ngasii apaa apaa buatt kamuuu, akuu belumm bisaaaa ngasii sesuatuu yangg kamuu mauu, akuu sekarangg hanyaa bisaa ngasihh ucapann kayaa ginii, maaf jugaa kaloo belumm bisaa kayaa mantann mantanmu yang ngasii sesuatu dihari spesialmu inii",
+            "nikmatiii harii bahagiaamuuu iniii, maemm makanann favoritmu,dengerinn laguu favoritmu (kalo bisa sih jadiin aku orang favoritmu ya hehe)",
+            "happyy birthdayy windaa manisss, enjoyy yourr speciall dayy sayanggg"
+        ];
+
+        async function startLetter() {
+            if (isLetterStarted) return;
+            isLetterStarted = true;
+            const container = document.getElementById('dynamic-messages');
+            container.innerHTML = '';
+            
+            for(let i=0; i < quotes.length; i++) {
+                if(!isLetterStarted) break;
+                const card = document.createElement('div');
+                card.className = 'message-card';
+                if(i === 0) card.innerHTML = `<span class="drop-cap">H</span>${quotes[i].slice(1)}`;
+                else card.innerText = quotes[i];
+
+                container.appendChild(card);
+                setupHaptic(card);
+                await new Promise(r => setTimeout(r, 100));
+                card.classList.add('reveal');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                await new Promise(r => setTimeout(r, 4000));
+                if(i < quotes.length - 1) {
+                    const div = document.createElement('div');
+                    div.className = 'divider';
+                    container.appendChild(div);
+                }
+            }
+            if(isLetterStarted) document.getElementById('final-touch').classList.remove('hidden');
+        }
+
+        function backToStart() {
+            isLetterStarted = false;
+            document.getElementById('final-touch').classList.add('hidden');
+            document.getElementById('dynamic-messages').innerHTML = '';
+            document.body.style.overflow = 'hidden';
+            transition(3, 1);
+        }
+
+        function transition(from, to, isLast = false) {
+            document.querySelectorAll('.section').forEach(s => { s.style.display = 'none'; s.classList.remove('active'); });
+            const next = document.getElementById(`stage${to}`);
+            next.style.display = (to === 3) ? 'block' : 'flex';
+            setTimeout(() => {
+                next.classList.add('active');
+                if(isLast) { document.body.style.overflowY = 'auto'; startLetter(); }
+            }, 50);
+        }
+    </script>
+</body>
+</html>
