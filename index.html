@@ -4,254 +4,263 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>For Winda</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400&family=Playfair+Display:italic,wght@400;700&family=Birthstone&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:italic,wght@300;400;600&family=Plus+Jakarta+Sans:wght@200;300;400&display=swap" rel="stylesheet">
-    <style>
-        :root { --gold: #d4af37; --dark: #050505; --glow: rgba(212, 175, 55, 0.4); }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--dark); color: white; margin: 0; overflow: hidden; -webkit-tap-highlight-color: transparent; }
-        .font-serif { font-family: 'Cormorant Garamond', serif; }
 
-        .section { display: none; opacity: 0; min-height: 100vh; width: 100%; flex-direction: column; align-items: center; transition: opacity 1s ease; position: relative; }
+    <style>
+        :root { --gold: #dfc28d; --bg: #080808; }
+        body { 
+            background: var(--bg); color: #fff; font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .font-sign { font-family: 'Birthstone', cursive; }
+
+        #canvas-bg { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at center, #111 0%, #050505 100%); }
+        #progress { position: fixed; top: 0; left: 0; height: 2px; background: var(--gold); width: 0%; transition: 0.5s; z-index: 100; box-shadow: 0 0 10px var(--gold); }
+
+        .section { display: none; opacity: 0; transition: 1s ease; }
         .active { display: flex; opacity: 1; }
 
-        #particleCanvas { position: fixed; inset: 0; z-index: -1; }
-
-        #overlay-blur {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(0px); opacity: 0; pointer-events: none;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 40;
+        .msg-node {
+            position: relative; padding: 1.8rem; margin-bottom: 5rem;
+            background: rgba(255,255,255,0.03); border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.06);
+            transform: translateY(30px); opacity: 0;
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+            max-width: 92%; line-height: 1.6; font-weight: 300;
         }
-        body.menu-open #overlay-blur { opacity: 1; backdrop-filter: blur(15px); pointer-events: auto; }
+        .msg-node.visible { transform: translateY(0); opacity: 1; }
+        .msg-node.blur { filter: blur(2px); opacity: 0.15; transform: scale(0.95); }
 
-        .message-card {
-            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
-            border-radius: 12px; padding: 2rem; border-left: 2px solid rgba(212, 175, 55, 0.3);
-            margin-bottom: 2.5rem; opacity: 0; transform: translateY(20px);
-            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); position: relative; user-select: none;
+        .typing { font-size: 10px; color: var(--gold); letter-spacing: 2px; margin-bottom: 15px; opacity: 0.7; display: flex; align-items: center; gap: 6px; padding-left: 10px; }
+        .dot { width: 4px; height: 4px; background: var(--gold); border-radius: 50%; animation: blink 1.4s infinite; }
+
+        @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+        .btn-main {
+            padding: 14px 35px; border: 1px solid var(--gold); color: var(--gold);
+            background: transparent; font-size: 11px; letter-spacing: 4px;
+            text-transform: uppercase; transition: 0.4s;
         }
-        .message-card.reveal { opacity: 1; transform: translateY(0); }
+        .btn-main:hover { background: var(--gold); color: #000; }
 
-        .message-card:hover:not(.focused) {
-            background: rgba(255, 255, 255, 0.06); border-left: 2px solid var(--gold);
-            transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        .haptic-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            z-index: 200; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s;
         }
-
-        .message-card.focused {
-            z-index: 50; background: rgba(255, 255, 255, 0.12) !important;
-            border-left: 2px solid var(--gold) !important; transform: scale(1.05) !important;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
-        }
-
-        .action-menu {
-            position: absolute; bottom: -55px; right: 0; display: flex; gap: 8px;
-            opacity: 0; transform: translateY(10px); transition: 0.3s ease;
-        }
-        .focused .action-menu { opacity: 1; transform: translateY(0); }
-        .action-item {
-            background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 20px;
-            font-size: 11px; color: var(--gold); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .drop-cap { float: left; font-size: 3.5rem; line-height: 0.8; font-family: 'Cormorant Garamond', serif; color: var(--gold); margin-right: 12px; font-style: italic; }
-        .divider { width: 40px; height: 1px; background: var(--gold); margin: 3rem auto; opacity: 0.2; }
-
-        .btn-luxury { padding: 1rem 3rem; border: 1px solid var(--gold); color: var(--gold); font-size: 10px; letter-spacing: 0.5em; text-transform: uppercase; cursor: pointer; transition: 0.4s; background: transparent; }
-        .btn-luxury:hover { background: var(--gold); color: black; box-shadow: 0 0 20px var(--glow); }
+        .haptic-card { background: #151515; padding: 25px; border-radius: 24px; text-align: center; border: 1px solid rgba(223, 194, 141, 0.3); transform: scale(0.9); transition: 0.3s; }
+        .haptic-overlay.active { display: flex; opacity: 1; }
+        .haptic-overlay.active .haptic-card { transform: scale(1); }
+        
+        #s3 { -webkit-overflow-scrolling: touch; }
     </style>
 </head>
-<body class="bg-black">
+<body>
 
-    <!-- AUDIO ELEMENT - Taruh di luar section agar tidak ikut ter-reset -->
-    <audio id="backsong" preload="auto" loop>
-        <source src="tunggal.mp3" type="audio/mpeg">
-    </audio>
+    <div id="progress"></div>
+    <canvas id="canvas-bg"></canvas>
+    <audio id="song" loop preload="auto"><source src="tunggal.mp3" type="audio/mpeg"></audio>
 
-    <canvas id="particleCanvas"></canvas>
-    <div id="overlay-blur" onclick="closeMenu()"></div>
+    <div id="haptic-menu" class="haptic-overlay" onclick="closeHaptic()">
+        <div class="haptic-card" onclick="event.stopPropagation()">
+            <p class="font-serif italic text-gold mb-5">Winda's Moment</p>
+            <div class="flex gap-4 justify-center">
+                <button onclick="closeHaptic()" class="px-5 py-2 bg-white/5 rounded-full text-[10px] uppercase tracking-widest">Love ❤️</button>
+                <button onclick="closeHaptic()" class="px-5 py-2 bg-white/5 rounded-full text-[10px] uppercase tracking-widest">Close</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- STAGE 1: INTRO -->
-    <section id="stage1" class="section active justify-center">
-        <h1 class="text-6xl font-serif italic mb-10 tracking-widest text-white">Winda.</h1>
-        <button onclick="startExperience()" class="btn-luxury">Only For Winda</button>
+    <!-- STAGE 1 -->
+    <section id="s1" class="section active h-screen flex-col items-center justify-center">
+        <h1 class="text-6xl font-serif italic tracking-[12px] mb-12">Secret.</h1>
+        <button onclick="start()" class="btn-main">Mulai Cerita</button>
     </section>
 
-    <!-- STAGE 2: GAME -->
-    <section id="stage2" class="section justify-center">
-        <div class="text-center mb-8">
-            <h2 class="text-xl font-serif italic text-gold">Petik Bintang</h2>
-            <p class="text-[8px] tracking-[0.5em] opacity-30 uppercase text-white">Kumpulkan 8 cahaya</p>
-        </div>
-        <canvas id="gameCanvas" style="background: rgba(255,255,255,0.02); border-radius: 12px;"></canvas>
-        <div class="mt-6 text-gold font-serif text-2xl tracking-[0.8em]"><span id="score">0</span> / 8</div>
+    <!-- STAGE 2 -->
+    <section id="s2" class="section h-screen flex-col items-center justify-center p-6">
+        <p class="text-[9px] tracking-[5px] text-gold/50 uppercase mb-10">Kumpulkan Cahaya Hati</p>
+        <canvas id="gameCanvas" class="bg-white/5 rounded-[40px]"></canvas>
+        <div class="mt-10 font-serif text-3xl tracking-[12px] text-gold"><span id="score">0</span>/8</div>
     </section>
 
-    <!-- STAGE 3: LETTER -->
-    <section id="stage3" class="section !justify-start pt-[30vh] pb-[20vh] px-6 overflow-y-auto">
-        <div class="max-w-xl w-full mx-auto" id="letter-content-wrapper">
-            <div id="letter-header" class="mb-40">
-                <h2 class="text-6xl font-serif italic mb-4 leading-tight text-white">Happy<br>Birthday.</h2>
-                <div class="w-10 h-[1px] bg-gold"></div>
+    <!-- STAGE 3 -->
+    <section id="s3" class="section h-screen flex-col pt-[15vh] px-7 overflow-y-auto">
+        <div class="max-w-md mx-auto w-full pb-60">
+            <div class="mb-24 opacity-60">
+                <h2 class="text-4xl font-serif italic">Only For Winda,</h2>
+                <div class="w-8 h-px bg-gold mt-3"></div>
             </div>
-            <div id="dynamic-messages"></div>
-        </div>
+            
+            <div id="msg-box"></div>
 
-        <div id="final-touch" class="hidden py-20 text-center px-4 w-full">
-            <div class="message-card !opacity-100 !transform-none border-t border-l-0 mx-auto max-w-sm mb-12">
-                <p class="font-serif italic text-3xl mb-3 text-white">Enjoy your day, sayang.</p>
-                <span class="text-[10px] tracking-[0.5em] text-gold/50 uppercase block mb-4">You are my favorite person</span>
-                <span class="text-[10px] tracking-[0.8em] text-white/20 uppercase block">— Sabil —</span>
+            <div id="final" class="hidden text-center mt-24">
+                <p class="font-sign text-7xl text-gold mb-6">You're My Favorite Person</p>
+                <button onclick="location.reload()" class="text-[8px] tracking-[4px] uppercase opacity-30 mt-12 hover:opacity-100 transition-opacity">Mulai Dari Awal</button>
             </div>
-            <button onclick="backToStart()" class="btn-luxury !text-[8px] !py-3 !px-8 opacity-40 hover:opacity-100">Mulai Lagi</button>
         </div>
     </section>
 
     <script>
-        let score = 0;
-        let isLetterStarted = false;
-        const song = document.getElementById('backsong');
+        const song = document.getElementById('song');
+        let letterIsRunning = false;
 
-        /* BG PARTICLES */
-        const pCanvas = document.getElementById('particleCanvas');
-        const pCtx = pCanvas.getContext('2d');
-        function initP() { pCanvas.width = window.innerWidth; pCanvas.height = window.innerHeight; }
-        window.addEventListener('resize', initP); initP();
-        let pts = Array(60).fill().map(() => ({ x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight, v: Math.random()*0.2 + 0.1, s: Math.random()*1.2 }));
-        function drawP() {
-            pCtx.clearRect(0,0,pCanvas.width, pCanvas.height); pCtx.fillStyle = "rgba(212, 175, 55, 0.2)";
-            pts.forEach(p => { p.y -= p.v; if(p.y < 0) p.y = pCanvas.height; pCtx.beginPath(); pCtx.arc(p.x, p.y, p.s, 0, Math.PI*2); pCtx.fill(); });
-            requestAnimationFrame(drawP);
+        // BG Animation
+        const canvas = document.getElementById('canvas-bg');
+        const ctx = canvas.getContext('2d');
+        let pts = [];
+        function initBg() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            pts = Array(35).fill().map(() => ({
+                x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+                r: Math.random()*1.5, s: Math.random()*0.015, a: Math.random()*Math.PI*2
+            }));
         }
-        drawP();
-
-        /* AUDIO FIX & EXPERIENCE START */
-        function startExperience() { 
-            // Coba putar musik dengan penanganan error autoplay
-            song.play().catch(error => {
-                console.log("Autoplay blocked, waiting for interaction");
+        function drawBg() {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            pts.forEach(p => {
+                p.a += p.s;
+                ctx.beginPath();
+                ctx.arc(p.x + Math.cos(p.a)*15, p.y + Math.sin(p.a)*15, p.r, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(223, 194, 141, ${0.1 + Math.abs(Math.sin(p.a))*0.25})`;
+                ctx.fill();
             });
-            transition(1, 2); 
-            initGame(); 
+            requestAnimationFrame(drawBg);
+        }
+        window.addEventListener('resize', initBg); initBg(); drawBg();
+
+        function start() {
+            song.play().catch(() => {});
+            transition('s1', 's2');
+            initGame();
         }
 
-        /* GAME ENGINE */
-        const gCanvas = document.getElementById('gameCanvas');
-        const gCtx = gCanvas.getContext('2d');
-        let stars = [];
+        function transition(from, to) {
+            const f = document.getElementById(from);
+            const t = document.getElementById(to);
+            f.classList.remove('active');
+            setTimeout(() => {
+                f.style.display = 'none';
+                t.style.display = (to === 's3') ? 'block' : 'flex';
+                setTimeout(() => t.classList.add('active'), 50);
+                if(to === 's3' && !letterIsRunning) playLetter();
+            }, 800);
+        }
+
         function initGame() {
-            score = 0; document.getElementById('score').innerText = "0";
-            gCanvas.width = 280; gCanvas.height = 350;
-            stars = Array(8).fill().map(() => ({ x: Math.random()*240+20, y: Math.random()*310+20, a: Math.random()*Math.PI }));
-            loopGame();
-        }
-        gCanvas.addEventListener('mousedown', (e) => {
-            const rect = gCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-            stars.forEach((s, i) => {
-                if(Math.hypot(x - s.x, y - s.y) < 35) {
-                    stars.splice(i, 1); score++;
-                    document.getElementById('score').innerText = score;
-                    confetti({ particleCount: 15, colors: ['#d4af37'], origin: { x: e.clientX/window.innerWidth, y: e.clientY/window.innerHeight } });
-                }
-            });
-            if(score >= 8) {
-                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                setTimeout(() => transition(2, 3, true), 800);
-            }
-        });
-        function loopGame() {
-            if(score >= 8) return;
-            gCtx.fillStyle = 'rgba(5, 5, 5, 0.3)'; gCtx.fillRect(0,0,280,350);
-            stars.forEach(s => { s.a += 0.05; gCtx.fillStyle = `rgba(212, 175, 55, ${0.4+Math.sin(s.a)*0.4})`; gCtx.beginPath(); gCtx.arc(s.x, s.y, 4, 0, Math.PI*2); gCtx.fill(); });
-            requestAnimationFrame(loopGame);
-        }
+            const gC = document.getElementById('gameCanvas');
+            const gCtx = gC.getContext('2d');
+            gC.width = 280; gC.height = 350;
+            let score = 0;
+            let lights = Array(8).fill().map(() => ({ x: Math.random()*240+20, y: Math.random()*310+20, hit: false }));
 
-        /* HAPTIC & MENU */
-        function setupHaptic(card) {
-            let pressTimer;
-            const openMenu = () => {
-                document.body.classList.add('menu-open');
-                card.classList.add('focused');
-                if (window.navigator.vibrate) window.navigator.vibrate(15);
-                const menu = document.createElement('div');
-                menu.className = 'action-menu';
-                menu.innerHTML = `<div class="action-item">Love ❤️</div><div class="action-item">Copy</div>`;
-                card.appendChild(menu);
+            gC.onclick = (e) => {
+                const r = gC.getBoundingClientRect();
+                const x = e.clientX - r.left; const y = e.clientY - r.top;
+                lights.forEach(l => {
+                    if(!l.hit && Math.hypot(x-l.x, y-l.y) < 35) {
+                        l.hit = true; score++;
+                        document.getElementById('score').innerText = score;
+                        confetti({ particleCount: 15, colors:['#dfc28d'], origin: {x: e.clientX/window.innerWidth, y: e.clientY/window.innerHeight} });
+                        if(navigator.vibrate) navigator.vibrate(10);
+                    }
+                });
+                if(score === 8) setTimeout(() => transition('s2', 's3'), 600);
             };
-            const startPress = () => { pressTimer = setTimeout(openMenu, 600); };
-            const endPress = () => { clearTimeout(pressTimer); };
-            card.addEventListener('mousedown', startPress);
-            card.addEventListener('mouseup', endPress);
-            card.addEventListener('touchstart', startPress);
-            card.addEventListener('touchend', endPress);
+
+            function draw() {
+                if(score === 8) return;
+                gCtx.fillStyle = 'rgba(8,8,8,0.2)'; gCtx.fillRect(0,0,280,350);
+                lights.forEach(l => {
+                    if(!l.hit) {
+                        gCtx.beginPath(); gCtx.arc(l.x, l.y, 4, 0, Math.PI*2);
+                        gCtx.fillStyle = '#dfc28d'; gCtx.shadowBlur = 10; gCtx.shadowColor = '#dfc28d';
+                        gCtx.fill();
+                    }
+                });
+                requestAnimationFrame(draw);
+            }
+            draw();
         }
 
-        function closeMenu() {
-            document.body.classList.remove('menu-open');
-            document.querySelectorAll('.message-card').forEach(c => {
-                c.classList.remove('focused');
-                const m = c.querySelector('.action-menu'); if(m) m.remove();
-            });
-        }
-
-        /* QUOTES DATA */
-        const quotes = [
+        // TEKS ASLI DISINKRONKAN
+        const lines = [
             "haiiii makasii yaa uda ngebukaa inii dan mainin minigamesss tadii",
             "sebenernya aku bingung harus mulaii darii manaa rasanee banyakk kataa yangg mauu akuu ketikk, tapii akuu sederhanainn ajaa yaa",
-            "selamatt birthdayyy windaaa, makasii yaa udaa lahirr diduniaa iniii makasii jugaa udaa nemeninn akuu,mengenalmuu adalahh hall yangg sangatt aku syukuriii",
+            "selamatt birthdayyy windaaa, makasii yaa udaa lahirr diduniaa iniii makasii jugaa udaa nemeninn akuu, mengenalmuu adalahh hall yangg sangatt aku syukuriii",
             "diumurmuu yangg baruu inii semogaa semestaa selaluu menjaga senyummu. kamuu punyaa daya tarikk tersendiri buatt akuu, sertaa duniakuu jadii lebihh indahh sejak adaa kamuu",
             "semogaa setiapp langkahmu diringankan, setiap bebanmu dikuatkan, dan semoga mimpi yang kamu dimpan bisa terwujudd satu per satuu di waktu yang paling tepat",
             "jangan pernah ragu untuk jadi dirimu sendiri. kamu yang apa adanyaa dengan segala tawa dan ceritamuu sudah lebih dari cukup untuk orang yang menyayangimu (termasuk aku hehe)",
             "makasiii jugaa yaa udaa mauu nemeninnn harii hariikuu akhirr akhirr inii. akuu sangat menikmati segala obrolann kitaa, candaaa tawaa muu ituu lahh yang membuat akuu senangg semogaa ajaa kedepannya kitaa akann teruss kayaa ginii",
             "maaff jugaa kaloo akuu belumm bisaa ngasii apaa apaa buatt kamuuu, akuu belumm bisaaaa ngasii sesuatuu yangg kamuu mauu, akuu sekarangg hanyaa bisaa ngasihh ucapann kayaa ginii, maaf jugaa kaloo belumm bisaa kayaa mantann mantanmu yang ngasii sesuatu dihari spesialmu inii",
-            "nikmatiii harii bahagiaamuuu iniii, maemm makanann favoritmu,dengerinn laguu favoritmu (kalo bisa sih jadiin aku orang favoritmu ya hehe)",
+            "nikmatiii harii bahagiaamuuu iniii, maemm makanann favoritmu, dengerinn laguu favoritmu (kalo bisa sih jadiin aku orang favoritmu ya hehe)",
             "happyy birthdayy windaa manisss, enjoyy yourr speciall dayy sayanggg"
         ];
 
-        async function startLetter() {
-            if (isLetterStarted) return;
-            isLetterStarted = true;
-            const container = document.getElementById('dynamic-messages');
-            container.innerHTML = '';
-            
-            for(let i=0; i < quotes.length; i++) {
-                if(!isLetterStarted) break;
-                const card = document.createElement('div');
-                card.className = 'message-card';
-                if(i === 0) card.innerHTML = `<span class="drop-cap">H</span>${quotes[i].slice(1)}`;
-                else card.innerText = quotes[i];
+        async function playLetter() {
+            letterIsRunning = true;
+            const box = document.getElementById('msg-box');
+            const prog = document.getElementById('progress');
 
-                container.appendChild(card);
-                setupHaptic(card);
-                await new Promise(r => setTimeout(r, 100));
-                card.classList.add('reveal');
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                await new Promise(r => setTimeout(r, 4000));
-                if(i < quotes.length - 1) {
-                    const div = document.createElement('div');
-                    div.className = 'divider';
-                    container.appendChild(div);
-                }
+            for(let i=0; i<lines.length; i++) {
+                const old = box.querySelectorAll('.msg-node');
+                if(old.length > 0) old[old.length-1].classList.add('blur');
+
+                // 1. Tampilkan indikator mengetik
+                const typeWrap = document.createElement('div');
+                typeWrap.className = 'typing';
+                typeWrap.innerHTML = `Sabil mengetik <div class="dot"></div><div class="dot" style="animation-delay:0.2s"></div><div class="dot" style="animation-delay:0.4s"></div>`;
+                box.appendChild(typeWrap);
+                typeWrap.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+                // Jeda ngetik disesuaikan dengan panjang teks yang akan muncul (biar logis)
+                let typingSpeed = 1500 + (lines[i].length * 10); 
+                await new Promise(r => setTimeout(r, Math.min(typingSpeed, 4000)));
+                
+                typeWrap.remove();
+
+                // 2. Munculkan pesan
+                const el = document.createElement('div');
+                el.className = 'msg-node';
+                el.innerText = lines[i];
+                box.appendChild(el);
+
+                const mc = new Hammer(el);
+                mc.get('press').set({ time: 500 });
+                mc.on('press', () => {
+                    if(navigator.vibrate) navigator.vibrate(25);
+                    document.getElementById('haptic-menu').classList.add('active');
+                });
+
+                setTimeout(() => el.classList.add('visible'), 50);
+                
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                
+                prog.style.width = `${((i+1)/lines.length)*100}%`;
+                
+                // 3. DYNAMIC TIMING (Kunci Perbaikan)
+                // Kita kasih waktu baca 100ms per karakter + 2 detik flat.
+                // Minimal 4 detik, maksimal 10 detik per slide pesan.
+                let readingTime = 2000 + (lines[i].length * 60); 
+                let finalWait = Math.max(4000, Math.min(readingTime, 10000));
+                
+                await new Promise(r => setTimeout(r, finalWait));
             }
-            if(isLetterStarted) document.getElementById('final-touch').classList.remove('hidden');
-        }
-
-        function backToStart() {
-            isLetterStarted = false;
-            document.getElementById('final-touch').classList.add('hidden');
-            document.getElementById('dynamic-messages').innerHTML = '';
-            document.body.style.overflow = 'hidden';
-            transition(3, 1);
-        }
-
-        function transition(from, to, isLast = false) {
-            document.querySelectorAll('.section').forEach(s => { s.style.display = 'none'; s.classList.remove('active'); });
-            const next = document.getElementById(`stage${to}`);
-            next.style.display = (to === 3) ? 'block' : 'flex';
+            
+            document.getElementById('final').classList.remove('hidden');
             setTimeout(() => {
-                next.classList.add('active');
-                if(isLast) { document.body.style.overflowY = 'auto'; startLetter(); }
-            }, 50);
+                document.getElementById('final').scrollIntoView({ behavior: 'smooth' });
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.8 } });
+            }, 500);
+        }
+
+        function closeHaptic() {
+            document.getElementById('haptic-menu').classList.remove('active');
         }
     </script>
 </body>
